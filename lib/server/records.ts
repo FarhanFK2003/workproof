@@ -18,6 +18,7 @@ import {
   type WorkRecordFormValues,
 } from "@/lib/validation";
 import type { Database } from "./database.types";
+import { requireOwner } from "./session";
 import { getServiceClient } from "./supabase";
 import {
   CONFIRMATION_LINK_TTL_DAYS,
@@ -33,8 +34,9 @@ import {
  * its input before querying, because the service-role client bypasses RLS.
  * Status changes go through the database functions, which enforce the workflow.
  *
- * Note: there is no authentication yet. These functions do not check who is
- * calling; any route that exposes them is reachable by anyone using the app.
+ * Authorization: freelancer operations call requireOwner() first and throw
+ * UnauthorizedError without a valid owner session, regardless of which page or
+ * action calls them. Client operations are authorized by the confirmation token.
  */
 
 type WorkRecordRow = Database["public"]["Tables"]["work_records"]["Row"];
@@ -121,6 +123,7 @@ const RECORD_SELECT =
 // ---------------------------------------------------------------------------
 
 export async function listWorkRecords(): Promise<WorkRecord[]> {
+  await requireOwner();
   const { data, error } = await getServiceClient()
     .from("work_records")
     .select(RECORD_SELECT)
@@ -130,6 +133,7 @@ export async function listWorkRecords(): Promise<WorkRecord[]> {
 }
 
 export async function getWorkRecord(id: string): Promise<WorkRecord | null> {
+  await requireOwner();
   if (!UUID_PATTERN.test(id)) return null;
   const { data, error } = await getServiceClient()
     .from("work_records")
@@ -148,6 +152,7 @@ export type CreateWorkRecordResult =
 export async function createWorkRecord(
   values: WorkRecordFormValues,
 ): Promise<CreateWorkRecordResult> {
+  await requireOwner();
   const parsed = parseWorkRecord(values);
   if (!parsed.ok) return parsed;
   const input = parsed.value;
@@ -183,6 +188,7 @@ export type IssueLinkResult =
  * The raw token is returned once for building the URL and is never stored.
  */
 export async function issueConfirmationLink(recordId: string): Promise<IssueLinkResult> {
+  await requireOwner();
   if (!UUID_PATTERN.test(recordId)) return { ok: false, reason: "not_found" };
 
   const { token, tokenHash } = generateConfirmationToken();

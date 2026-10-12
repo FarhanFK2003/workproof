@@ -1,28 +1,24 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { DemoNotice, DemoTag } from "@/components/demo-notice";
 import { ArrowRightIcon, CheckIcon, HashIcon, LockIcon } from "@/components/icons";
 import { Container, PageHeader } from "@/components/page-layout";
+import { PageSkeleton } from "@/components/page-skeleton";
 import { CopyLinkField } from "@/components/records/copy-link-field";
 import { RecordTimeline } from "@/components/records/record-timeline";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { demoFreelancer, demoRecords, getDemoRecord } from "@/lib/demo-data";
+import { demoFreelancer, getDemoRecord } from "@/lib/demo-data";
 import { formatDate, formatDateRange, formatMoney } from "@/lib/format";
+import { requireOwnerForPage } from "@/lib/server/session";
 import type { WorkRecord } from "@/lib/types";
 
-export function generateStaticParams() {
-  return demoRecords.map((record) => ({ id: record.id }));
-}
-
-export async function generateMetadata({
-  params,
-}: PageProps<"/records/[id]">): Promise<Metadata> {
-  const { id } = await params;
-  return { title: getDemoRecord(id)?.title ?? "Record not found" };
-}
+// Generic on purpose: metadata renders before the session check, so it must not
+// reveal record details.
+export const metadata: Metadata = { title: "Work record" };
 
 function ConfirmationCard({ record }: { record: WorkRecord }) {
   const path = record.confirmationToken ? `/confirm/${record.confirmationToken}` : null;
@@ -147,13 +143,27 @@ function AnchoringCard({ record }: { record: WorkRecord }) {
   );
 }
 
-export default async function RecordPage({ params }: PageProps<"/records/[id]">) {
-  const { id } = await params;
+export default function RecordPage({ params }: PageProps<"/records/[id]">) {
+  return (
+    <Container className="py-8 sm:py-10">
+      <Suspense fallback={<PageSkeleton label="Loading record" />}>
+        {params.then(({ id }) => (
+          <RecordContent id={id} />
+        ))}
+      </Suspense>
+    </Container>
+  );
+}
+
+// The session check runs before the lookup, so a guessed ID redirects to login
+// instead of revealing whether the record exists.
+async function RecordContent({ id }: { id: string }) {
+  await requireOwnerForPage(`/records/${id}`);
   const record = getDemoRecord(id);
   if (!record) notFound();
 
   return (
-    <Container className="space-y-6 py-8 sm:py-10">
+    <div className="space-y-6">
       <PageHeader
         back={{ href: "/dashboard", label: "All records" }}
         eyebrow={
@@ -210,6 +220,6 @@ export default async function RecordPage({ params }: PageProps<"/records/[id]">)
           <AnchoringCard record={record} />
         </aside>
       </div>
-    </Container>
+    </div>
   );
 }

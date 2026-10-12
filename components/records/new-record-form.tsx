@@ -1,9 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, type ComponentProps, type FormEvent, type ReactNode } from "react";
+import {
+  useRef,
+  useState,
+  useTransition,
+  type ComponentProps,
+  type FormEvent,
+  type ReactNode,
+} from "react";
+import {
+  createRecordAction,
+  type CreateRecordState,
+} from "@/app/(main)/records/new/actions";
 import { DemoTag } from "@/components/demo-notice";
-import { CheckIcon, ChevronDownIcon, LockIcon } from "@/components/icons";
+import { AlertIcon, CheckIcon, ChevronDownIcon, LockIcon } from "@/components/icons";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { controlStyles, Input } from "@/components/ui/input";
@@ -52,7 +63,6 @@ const fieldOrder: { name: FieldName; label: string }[] = [
   { name: "currency", label: "Currency" },
 ];
 
-const SIMULATED_DELAY_MS = 900;
 const pendingSampleId = demoRecords.find((r) => r.status === "pending")?.id;
 
 function FormSection({
@@ -94,9 +104,12 @@ export function NewRecordForm() {
   const [values, setValues] = useState<WorkRecordFormValues>(initialValues);
   const [errors, setErrors] = useState<FieldErrors<FieldName>>({});
   const [attempted, setAttempted] = useState(false);
-  const [status, setStatus] = useState<"idle" | "submitting" | "success">("idle");
+  const [result, setResult] = useState<CreateRecordState>({ status: "idle" });
+  const [requestFailed, setRequestFailed] = useState(false);
+  const [submitting, startTransition] = useTransition();
   const summaryRef = useRef<HTMLDivElement>(null);
   const successRef = useRef<HTMLHeadingElement>(null);
+  const alertRef = useRef<HTMLDivElement>(null);
 
   function update(name: FieldName, value: string) {
     const next = { ...values, [name]: value };
@@ -105,30 +118,51 @@ export function NewRecordForm() {
     if (attempted) setErrors(validateWorkRecord(next));
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    // Client-side checks give instant feedback; the Server Action re-validates.
     const nextErrors = validateWorkRecord(values);
     setErrors(nextErrors);
     setAttempted(true);
+    setRequestFailed(false);
     if (hasErrors(nextErrors)) {
       // Wait for the summary to render before moving focus to it.
       requestAnimationFrame(() => summaryRef.current?.focus());
       return;
     }
-    setStatus("submitting");
-    await new Promise((resolve) => setTimeout(resolve, SIMULATED_DELAY_MS));
-    setStatus("success");
-    requestAnimationFrame(() => successRef.current?.focus());
+
+    const formData = new FormData(event.currentTarget);
+    startTransition(async () => {
+      let next: CreateRecordState;
+      try {
+        next = await createRecordAction({ status: "idle" }, formData);
+      } catch {
+        setRequestFailed(true);
+        requestAnimationFrame(() => alertRef.current?.focus());
+        return;
+      }
+      setResult(next);
+      if (next.status === "invalid") {
+        setErrors(next.errors);
+        requestAnimationFrame(() => summaryRef.current?.focus());
+      } else if (next.status === "unauthorized") {
+        requestAnimationFrame(() => alertRef.current?.focus());
+      } else if (next.status === "success") {
+        requestAnimationFrame(() => successRef.current?.focus());
+      }
+    });
   }
 
   function reset() {
     setValues(initialValues);
     setErrors({});
     setAttempted(false);
-    setStatus("idle");
+    setRequestFailed(false);
+    setResult({ status: "idle" });
   }
 
-  if (status === "success") {
+  if (result.status === "success") {
+    const { preview } = result;
     return (
       <Card className="p-6 sm:p-8">
         <div className="flex items-start gap-4">
@@ -140,8 +174,9 @@ export function NewRecordForm() {
               Record draft created (demo)
             </h2>
             <p className="text-sm leading-relaxed text-ink-muted">
-              This is a simulation. Nothing was saved, and no link was sent. Saving records and
-              generating real confirmation links arrive in the next milestone.
+              The server checked your session and validated the details, but nothing was saved
+              and no link was sent. Saving records and generating real confirmation links arrive
+              in the next milestone.
             </p>
           </div>
         </div>
@@ -151,10 +186,10 @@ export function NewRecordForm() {
             <StatusBadge status="draft" />
             <DemoTag />
           </div>
-          <p className="mt-3 font-medium text-ink">{values.title.trim()}</p>
+          <p className="mt-3 font-medium text-ink">{preview.title}</p>
           <p className="mt-0.5 text-sm text-ink-subtle">
-            {values.clientName.trim()}
-            {values.clientOrganization.trim() && ` · ${values.clientOrganization.trim()}`}
+            {preview.clientName}
+            {preview.clientOrganization && ` · ${preview.clientOrganization}`}
           </p>
         </div>
 
@@ -176,10 +211,38 @@ export function NewRecordForm() {
   }
 
   const summaryErrors = fieldOrder.filter(({ name }) => errors[name]);
-  const submitting = status === "submitting";
+  const sessionExpired = result.status === "unauthorized";
 
   return (
     <form onSubmit={handleSubmit} noValidate aria-describedby="form-required-note">
+      {(sessionExpired || requestFailed) && (
+        <div
+          ref={alertRef}
+          tabIndex={-1}
+          role="alert"
+          className="mb-6 flex gap-3 rounded-xl border border-danger/30 bg-danger-soft p-4 text-sm focus:outline-2 focus:outline-offset-2 focus:outline-danger sm:p-5"
+        >
+          <AlertIcon className="mt-0.5 text-danger" />
+          {sessionExpired ? (
+            <p className="text-ink">
+              <span className="font-semibold text-danger">Your session has ended. </span>
+              <Link
+                href="/login?next=%2Frecords%2Fnew"
+                className="font-medium text-danger underline underline-offset-2 hover:no-underline"
+              >
+                Sign in again
+              </Link>{" "}
+              to continue.
+            </p>
+          ) : (
+            <p className="text-ink">
+              <span className="font-semibold text-danger">Something went wrong. </span>
+              Check your connection and try again.
+            </p>
+          )}
+        </div>
+      )}
+
       {summaryErrors.length > 0 && (
         <div
           ref={summaryRef}

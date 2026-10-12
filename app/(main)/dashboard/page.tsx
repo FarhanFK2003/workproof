@@ -1,14 +1,27 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import { DemoNotice } from "@/components/demo-notice";
 import { PlusIcon } from "@/components/icons";
 import { Container, PageHeader } from "@/components/page-layout";
+import { PageSkeleton } from "@/components/page-skeleton";
 import { RecordList } from "@/components/records/record-list";
 import { buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { countByStatus, demoFreelancer, demoRecords } from "@/lib/demo-data";
+import { requireOwnerForPage } from "@/lib/server/session";
 
 export const metadata: Metadata = { title: "Dashboard" };
+
+export default function DashboardPage() {
+  return (
+    <Container className="py-8 sm:py-10">
+      <Suspense fallback={<PageSkeleton label="Loading dashboard" />}>
+        <DashboardContent />
+      </Suspense>
+    </Container>
+  );
+}
 
 function Metric({ label, value, hint }: { label: string; value: number; hint: string }) {
   return (
@@ -20,11 +33,13 @@ function Metric({ label, value, hint }: { label: string; value: number; hint: st
   );
 }
 
-export default function DashboardPage() {
+// Everything owner-specific renders here, after the server-side session check.
+async function DashboardContent() {
+  await requireOwnerForPage("/dashboard");
   const counts = countByStatus(demoRecords);
 
   return (
-    <Container className="space-y-8 py-8 sm:py-10">
+    <div className="space-y-8">
       <PageHeader
         title="Work records"
         description={`${demoFreelancer.name} · ${demoFreelancer.headline}`}
@@ -59,6 +74,6 @@ export default function DashboardPage() {
         </h2>
         <RecordList records={demoRecords} />
       </section>
-    </Container>
+    </div>
   );
 }

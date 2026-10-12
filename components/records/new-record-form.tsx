@@ -44,7 +44,9 @@ const fieldOrder: { name: FieldName; label: string }[] = [
   { name: "startDate", label: "Start date" },
   { name: "endDate", label: "End date" },
   { name: "summary", label: "Summary of work" },
+  { name: "deliverables", label: "Key deliverables" },
   { name: "clientName", label: "Client name" },
+  { name: "clientOrganization", label: "Company or organization" },
   { name: "clientEmail", label: "Client email" },
   { name: "amount", label: "Amount" },
   { name: "currency", label: "Currency" },
@@ -291,6 +293,7 @@ export function NewRecordForm() {
             id="deliverables"
             label="Key deliverables"
             hint="One per line. Your client will see this list."
+            error={errors.deliverables}
           >
             {(a11y) => (
               <Textarea
@@ -321,7 +324,11 @@ export function NewRecordForm() {
                 />
               )}
             </Field>
-            <Field id="clientOrganization" label="Company or organization">
+            <Field
+              id="clientOrganization"
+              label="Company or organization"
+              error={errors.clientOrganization}
+            >
               {(a11y) => (
                 <Input
                   {...a11y}

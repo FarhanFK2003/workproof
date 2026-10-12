@@ -61,5 +61,19 @@ export interface WorkRecord {
   linkExpiresAt?: string;
   confirmationToken?: string;
   response?: ClientResponse;
-  isDemo: true;
+  /** True for fictional sample data; false for records stored in Supabase. */
+  isDemo: boolean;
+}
+
+/**
+ * What the client sees on the confirmation page. Deliberately excludes the
+ * client email, record ID, and link metadata.
+ */
+export interface ConfirmationView {
+  /** "used" means the link was already consumed by a confirmation or dispute. */
+  state: "open" | "expired" | "used";
+  record: Pick<
+    WorkRecord,
+    "title" | "category" | "summary" | "deliverables" | "startDate" | "endDate" | "amount" | "status" | "response"
+  > & { client: Omit<ClientContact, "email"> };
 }

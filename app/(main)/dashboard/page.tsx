@@ -8,6 +8,7 @@ import { RecordList } from "@/components/records/record-list";
 import { buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { toRecordListItem } from "@/lib/record-list-item";
+import { listAnchoredRecordIds } from "@/lib/server/anchors";
 import { listWorkRecords } from "@/lib/server/records";
 import { requireOwnerForPage } from "@/lib/server/session";
 import { countByStatus } from "@/lib/status";
@@ -38,7 +39,11 @@ function Metric({ label, value, hint }: { label: string; value: number; hint: st
 // Database errors propagate to app/(main)/error.tsx.
 async function DashboardContent() {
   await requireOwnerForPage("/dashboard");
-  const records = await listWorkRecords();
+  const [stored, anchoredIds] = await Promise.all([listWorkRecords(), listAnchoredRecordIds()]);
+  // "Anchored" is derived: a confirmed record whose on-chain anchor is confirmed.
+  const records = stored.map((record) =>
+    anchoredIds.has(record.id) ? { ...record, status: "anchored" as const } : record,
+  );
   const counts = countByStatus(records);
 
   return (
@@ -60,9 +65,9 @@ async function DashboardContent() {
         </h2>
         <dl className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
           <Metric label="Total records" value={records.length} hint="Across all clients" />
-          <Metric label="Client-confirmed" value={counts.confirmed} hint="Ready to share" />
+          <Metric label="Client-confirmed" value={counts.confirmed} hint="Client-confirmed, not yet anchored" />
           <Metric label="Awaiting client" value={counts.pending} hint="Link sent, no response yet" />
-          <Metric label="Anchored" value={counts.anchored} hint="On-chain anchoring coming soon" />
+          <Metric label="Anchored" value={counts.anchored} hint="Fingerprint on Monad testnet" />
         </dl>
       </section>
 

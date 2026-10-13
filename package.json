@@ -9,13 +9,17 @@
     "lint": "eslint",
     "test": "node scripts/run-unit-tests.mjs",
     "test:e2e:auth": "node tests/e2e/auth.e2e.mjs",
-    "test:e2e:records": "node tests/e2e/records.e2e.mjs"
+    "test:e2e:records": "node tests/e2e/records.e2e.mjs",
+    "test:chain": "node scripts/run-chain-integration.mjs",
+    "test:contracts": "cd chain && npx hardhat test nodejs",
+    "test:e2e:anchoring": "node tests/e2e/anchoring.e2e.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",
     "next": "16.4.0",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "viem": "2.57.5"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",

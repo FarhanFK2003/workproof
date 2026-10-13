@@ -70,9 +70,74 @@ export type Database = {
           },
         ];
       };
+      /** Migration 20261013120000. Writes only via the record anchor functions. */
+      record_anchors: {
+        Row: {
+          record_id: string;
+          canonical_version: string;
+          salt: string;
+          record_commitment: string;
+          content_hash: string;
+          status: string;
+          chain_id: number | null;
+          contract_address: string | null;
+          tx_hash: string | null;
+          block_number: number | null;
+          failure_code: string | null;
+          attempts: number;
+          created_at: string;
+          updated_at: string;
+          submitted_at: string | null;
+          confirmed_at: string | null;
+        };
+        Insert: Record<string, never>;
+        Update: Record<string, never>;
+        Relationships: [
+          {
+            foreignKeyName: "record_anchors_record_id_fkey";
+            columns: ["record_id"];
+            isOneToOne: true;
+            referencedRelation: "work_records";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: { [_ in never]: never };
     Functions: {
+      begin_record_anchor: {
+        Args: {
+          p_record_id: string;
+          p_canonical_version: string;
+          p_salt: string;
+          p_record_commitment: string;
+          p_content_hash: string;
+        };
+        Returns: {
+          outcome: string;
+          anchor_salt: string | null;
+          anchor_record_commitment: string | null;
+          anchor_content_hash: string | null;
+          anchor_status: string | null;
+          anchor_tx_hash: string | null;
+        }[];
+      };
+      mark_record_anchor_submitted: {
+        Args: { p_record_id: string; p_tx_hash: string; p_chain_id: number; p_contract_address: string };
+        Returns: string;
+      };
+      resolve_record_anchor: {
+        Args: {
+          p_record_id: string;
+          p_outcome: string;
+          p_tx_hash?: string | null;
+          p_chain_id?: number | null;
+          p_contract_address?: string | null;
+          p_block_number?: number | null;
+          p_failure_code?: string | null;
+        };
+        Returns: string;
+      };
       issue_confirmation_request: {
         Args: { p_record_id: string; p_token_hash: string; p_expires_at: string };
         Returns: string;

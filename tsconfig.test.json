@@ -6,11 +6,22 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "types": ["node", "next"],
+    "types": [
+      "node",
+      "next"
+    ],
     "rootDir": ".",
     "outDir": ".test-build",
     "noEmit": false,
-    "incremental": false
+    "incremental": false,
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    }
   },
-  "include": ["tests/unit/**/*.ts"]
+  "include": [
+    "tests/unit/**/*.ts",
+    "tests/integration/**/*.ts"
+  ]
 }

@@ -1,0 +1,49 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_34-30c52a567143dea88c30a72a6c6368fd9b4a3b55",
+  "solcVersion": "0.8.34",
+  "solcLongVersion": "0.8.34+commit.80d5c536",
+  "compilerType": "solc",
+  "toolVersions": {
+    "hardhat": "3.19.0"
+  },
+  "userSourceNameMap": {
+    "contracts/WorkProofAnchor.sol": "project/contracts/WorkProofAnchor.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "osaka",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode.linkReferences",
+            "evm.bytecode.object",
+            "evm.bytecode.opcodes",
+            "evm.bytecode.sourceMap",
+            "evm.deployedBytecode.immutableReferences",
+            "evm.deployedBytecode.linkReferences",
+            "evm.deployedBytecode.object",
+            "evm.deployedBytecode.opcodes",
+            "evm.deployedBytecode.sourceMap",
+            "evm.methodIdentifiers"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/WorkProofAnchor.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.34;\n\n/// @title WorkProofAnchor\n/// @notice Records integrity commitments for client-confirmed WorkProof records.\n/// @dev Stores only opaque 32-byte values. `commitment` is a salted hash of the\n/// record ID and `contentHash` is the SHA-256 of the canonical record document;\n/// no names, emails, amounts, or confirmation tokens are ever written here.\n/// An anchor proves the document existed unchanged at anchoring time. It does not\n/// prove that the work claim is true or that any payment was made.\ncontract WorkProofAnchor {\n    struct Anchor {\n        bytes32 contentHash;\n        uint64 anchoredAt;\n    }\n\n    /// @notice The only account allowed to anchor, fixed at deployment.\n    /// @dev Prevents third parties from front-running a commitment with a\n    /// different content hash. Rotating it means deploying a new contract.\n    address public immutable anchorer;\n\n    mapping(bytes32 commitment => Anchor) private _anchors;\n\n    event RecordAnchored(bytes32 indexed commitment, bytes32 contentHash, uint64 anchoredAt);\n\n    error ZeroAnchorer();\n    error NotAnchorer();\n    error ZeroValue();\n    error AlreadyAnchored(bytes32 commitment);\n\n    constructor(address anchorer_) {\n        if (anchorer_ == address(0)) revert ZeroAnchorer();\n        anchorer = anchorer_;\n    }\n\n    /// @notice Anchors a record once. Reverts if the commitment already exists.\n    function anchor(bytes32 commitment, bytes32 contentHash) external {\n        if (msg.sender != anchorer) revert NotAnchorer();\n        if (commitment == bytes32(0) || contentHash == bytes32(0)) revert ZeroValue();\n        if (_anchors[commitment].anchoredAt != 0) revert AlreadyAnchored(commitment);\n\n        uint64 anchoredAt = uint64(block.timestamp);\n        _anchors[commitment] = Anchor(contentHash, anchoredAt);\n        emit RecordAnchored(commitment, contentHash, anchoredAt);\n    }\n\n    /// @notice Returns the anchored content hash, or zero values if not anchored.\n    function getAnchor(bytes32 commitment) external view returns (bytes32 contentHash, uint64 anchoredAt) {\n        Anchor memory stored = _anchors[commitment];\n        return (stored.contentHash, stored.anchoredAt);\n    }\n}\n"
+      }
+    }
+  }
+}

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { AnchorConfigError, readAnchorWriteConfig } from "./anchor-config";
 import { AppConfigError, getAppBaseUrl } from "./app-config";
 import { AuthConfigError, readAuthConfig } from "./auth-config";
 
@@ -39,9 +40,21 @@ export function findConfigProblems(): string[] {
     problems.push(error.message);
   }
 
+  if (process.env.NODE_ENV === "production" && process.env.WORKPROOF_ALLOW_LOCAL_CHAIN === "true") {
+    problems.push("WORKPROOF_ALLOW_LOCAL_CHAIN is enabled; this is for local testing only.");
+  }
+
+  // Monad anchoring is optional; report it only when it is set up incorrectly.
+  try {
+    readAnchorWriteConfig();
+  } catch (error) {
+    if (!(error instanceof AnchorConfigError)) throw error;
+    problems.push(error.message);
+  }
+
   // Anything prefixed NEXT_PUBLIC_ is inlined into browser bundles.
   for (const [name, value] of Object.entries(process.env)) {
-    if (name.startsWith("NEXT_PUBLIC_") && value && /sb_secret_|service_role/.test(value)) {
+    if (name.startsWith("NEXT_PUBLIC_") && value && /sb_secret_|service_role|^0x[0-9a-fA-F]{64}$/.test(value.trim())) {
       problems.push(`${name} appears to contain a secret key. Secrets must never use the NEXT_PUBLIC_ prefix.`);
     }
   }

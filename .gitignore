@@ -41,3 +41,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Hardhat project (chain/)
+/chain/node_modules
+/chain/artifacts
+/chain/cache
+/chain/types
+/chain/ignition/deployments/chain-31337

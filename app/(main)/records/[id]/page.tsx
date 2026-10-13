@@ -2,15 +2,17 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { DemoTag } from "@/components/demo-notice";
-import { CheckIcon, HashIcon, LockIcon } from "@/components/icons";
+import { CheckIcon, LockIcon } from "@/components/icons";
 import { Container, PageHeader } from "@/components/page-layout";
 import { PageSkeleton } from "@/components/page-skeleton";
+import { AnchorPanel } from "@/components/records/anchor-panel";
 import { ConfirmationLinkPanel } from "@/components/records/confirmation-link-panel";
 import { RecordTimeline } from "@/components/records/record-timeline";
-import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { formatDateRange, formatMoney } from "@/lib/format";
+import { panelStateFromRow } from "@/lib/server/anchor-runtime";
+import { getRecordAnchor } from "@/lib/server/anchors";
 import { getWorkRecord } from "@/lib/server/records";
 import { requireOwnerForPage } from "@/lib/server/session";
 import type { WorkRecord } from "@/lib/types";
@@ -53,32 +55,6 @@ function PrivateDetails({ record }: { record: WorkRecord }) {
   );
 }
 
-function AnchoringCard({ record }: { record: WorkRecord }) {
-  return (
-    <Card>
-      <CardHeader
-        title="Integrity anchoring"
-        action={<HashIcon className="mt-0.5 text-violet" />}
-        description="Records a fingerprint of the confirmed record on Monad so anyone can check it hasn't changed."
-      />
-      <CardBody className="space-y-3">
-        <p className="flex items-center justify-between rounded-lg bg-canvas px-3 py-2 text-sm">
-          <span className="text-ink-subtle">Status</span>
-          <span className="font-medium text-ink">Not anchored</span>
-        </p>
-        <Button variant="secondary" disabled className="w-full" aria-describedby="anchor-note">
-          Anchor to Monad
-        </Button>
-        <p id="anchor-note" className="text-xs leading-relaxed text-ink-subtle">
-          {record.status === "confirmed"
-            ? "Coming in a later milestone. Only a salted fingerprint will be recorded, never emails, amounts, or receipts."
-            : "Only client-confirmed records can be anchored."}
-        </p>
-      </CardBody>
-    </Card>
-  );
-}
-
 export default function RecordPage({ params }: PageProps<"/records/[id]">) {
   return (
     <Container className="py-8 sm:py-10">
@@ -97,6 +73,8 @@ async function RecordContent({ id }: { id: string }) {
   await requireOwnerForPage(`/records/${id}`);
   const record = await getWorkRecord(id);
   if (!record) notFound();
+  // Anchoring state comes from the database only; the page never waits on the chain.
+  const anchorState = panelStateFromRow(record.status, await getRecordAnchor(record.id));
 
   return (
     <div className="space-y-6">
@@ -161,7 +139,7 @@ async function RecordContent({ id }: { id: string }) {
             respondedAt={record.response?.respondedAt}
           />
           <PrivateDetails record={record} />
-          <AnchoringCard record={record} />
+          <AnchorPanel recordId={record.id} initial={anchorState} />
         </aside>
       </div>
     </div>

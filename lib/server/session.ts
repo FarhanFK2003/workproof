@@ -112,11 +112,17 @@ export async function deleteOwnerSession(): Promise<void> {
 }
 
 /**
- * Best-effort client identifier for login throttling. X-Forwarded-For is only
- * trustworthy behind a proxy that overwrites it (e.g. Vercel).
+ * Client identifier for rate limiting, or null when none can be trusted.
+ *
+ * X-Forwarded-For is only trustworthy when a proxy in front of the app
+ * overwrites it. Vercel does; `next start` exposed directly does not (Next only
+ * fills the header when the client didn't send one), so a client could rotate it
+ * to dodge per-client limits. Trust it on Vercel, or when
+ * WORKPROOF_TRUST_PROXY_HEADERS=true is set behind a proxy you control.
  */
-export async function getClientKey(): Promise<string> {
-  const requestHeaders = await headers();
-  const forwarded = requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return (forwarded || requestHeaders.get("x-real-ip") || "unknown").slice(0, 64);
+export async function getTrustedClientKey(): Promise<string | null> {
+  const trusted = process.env.VERCEL === "1" || process.env.WORKPROOF_TRUST_PROXY_HEADERS === "true";
+  if (!trusted) return null;
+  const forwarded = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim();
+  return forwarded ? forwarded.slice(0, 64) : null;
 }

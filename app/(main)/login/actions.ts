@@ -8,7 +8,7 @@ import {
   clearLoginFailures,
   recordLoginFailure,
 } from "@/lib/server/login-throttle";
-import { createOwnerSession, deleteOwnerSession, getClientKey } from "@/lib/server/session";
+import { createOwnerSession, deleteOwnerSession, getTrustedClientKey } from "@/lib/server/session";
 import { passcodeMatches } from "@/lib/server/session-token";
 
 export interface LoginState {
@@ -31,7 +31,7 @@ export async function login(_previous: LoginState, formData: FormData): Promise<
     return { error: "Sign-in isn't available because the server is missing its configuration." };
   }
 
-  const clientKey = await getClientKey();
+  const clientKey = await getTrustedClientKey();
   const gate = checkLoginAllowed(clientKey);
   if (!gate.allowed) {
     const minutes = Math.ceil(gate.retryAfterSeconds / 60);

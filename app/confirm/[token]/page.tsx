@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
-import { CheckIcon, ClockIcon, InfoIcon } from "@/components/icons";
+import { AlertIcon, CheckIcon, ClockIcon, InfoIcon } from "@/components/icons";
 import { Container } from "@/components/page-layout";
 import { ConfirmPanel } from "@/components/records/confirm-panel";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { formatDate, formatDateRange, formatMoney } from "@/lib/format";
 import { getOwnerDisplayName } from "@/lib/server/app-config";
+import { isConfirmLookupBlocked, recordInvalidConfirmToken } from "@/lib/server/confirm-throttle";
 import { getConfirmationView } from "@/lib/server/records";
+import { getTrustedClientKey } from "@/lib/server/session";
 import type { ConfirmationView } from "@/lib/types";
 
 export const metadata: Metadata = {
@@ -32,8 +34,23 @@ export default function ConfirmPage({ params }: PageProps<"/confirm/[token]">) {
 }
 
 async function ConfirmContent({ token }: { token: string }) {
+  // Floods of invalid tokens are turned away before they reach the database.
+  const clientKey = await getTrustedClientKey();
+  if (isConfirmLookupBlocked(clientKey)) {
+    return (
+      <StatusCard
+        icon={<AlertIcon className="size-5" />}
+        title="Too many attempts"
+        description="Too many invalid confirmation links were opened from your network. Please wait a few minutes and try your link again."
+      />
+    );
+  }
+
   const view = await getConfirmationView(token);
-  if (!view) notFound();
+  if (!view) {
+    recordInvalidConfirmToken(clientKey);
+    notFound();
+  }
 
   const ownerName = getOwnerDisplayName();
   const freelancerRef = ownerName ?? "the freelancer";

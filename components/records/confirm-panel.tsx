@@ -115,7 +115,7 @@ export function ConfirmPanel({ token, freelancerName, organization }: ConfirmPan
       if (next.status === "invalid_input") {
         setErrors(next.errors);
         focusFirstInvalid();
-      } else if (next.status === "error") {
+      } else if (next.status === "error" || next.status === "rate_limited") {
         requestAnimationFrame(() => alertRef.current?.focus());
       } else {
         requestAnimationFrame(() => outcomeRef.current?.focus());
@@ -181,7 +181,7 @@ export function ConfirmPanel({ token, freelancerName, organization }: ConfirmPan
           </p>
         </div>
 
-        {result.status === "error" && (
+        {(result.status === "error" || result.status === "rate_limited") && (
           <div
             ref={alertRef}
             tabIndex={-1}
@@ -190,8 +190,9 @@ export function ConfirmPanel({ token, freelancerName, organization }: ConfirmPan
           >
             <AlertIcon className="mt-0.5 text-danger" />
             <p className="text-ink">
-              We couldn&rsquo;t save your response. Nothing was recorded, so please try again in a
-              moment.
+              {result.status === "rate_limited"
+                ? "Too many attempts from your network. Nothing was recorded. Please wait a few minutes and try again."
+                : "We couldn’t save your response. Nothing was recorded, so please try again in a moment."}
             </p>
           </div>
         )}

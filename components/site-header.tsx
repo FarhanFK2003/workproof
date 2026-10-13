@@ -31,7 +31,7 @@ export function SiteFooter() {
     <footer className="mt-auto border-t border-line">
       <Container className="flex flex-col gap-1 py-6 text-xs text-ink-subtle sm:flex-row sm:justify-between">
         <p>WorkProof prototype · Monad Metropolis Hackathon</p>
-        <p>All records shown are demo data. Nothing is written to a blockchain yet.</p>
+        <p>Records are stored privately. Nothing is written to a blockchain yet.</p>
       </Container>
     </footer>
   );

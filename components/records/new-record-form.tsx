@@ -13,16 +13,13 @@ import {
   createRecordAction,
   type CreateRecordState,
 } from "@/app/(main)/records/new/actions";
-import { DemoTag } from "@/components/demo-notice";
-import { AlertIcon, CheckIcon, ChevronDownIcon, LockIcon } from "@/components/icons";
+import { AlertIcon, ChevronDownIcon, LockIcon } from "@/components/icons";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { controlStyles, Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/label";
-import { StatusBadge } from "@/components/ui/status-badge";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
-import { demoClientLinkPath, demoRecords } from "@/lib/demo-data";
 import { CATEGORIES, CURRENCIES } from "@/lib/types";
 import {
   hasErrors,
@@ -62,8 +59,6 @@ const fieldOrder: { name: FieldName; label: string }[] = [
   { name: "amount", label: "Amount" },
   { name: "currency", label: "Currency" },
 ];
-
-const pendingSampleId = demoRecords.find((r) => r.status === "pending")?.id;
 
 function FormSection({
   title,
@@ -108,7 +103,6 @@ export function NewRecordForm() {
   const [requestFailed, setRequestFailed] = useState(false);
   const [submitting, startTransition] = useTransition();
   const summaryRef = useRef<HTMLDivElement>(null);
-  const successRef = useRef<HTMLHeadingElement>(null);
   const alertRef = useRef<HTMLDivElement>(null);
 
   function update(name: FieldName, value: string) {
@@ -133,7 +127,7 @@ export function NewRecordForm() {
 
     const formData = new FormData(event.currentTarget);
     startTransition(async () => {
-      let next: CreateRecordState;
+      let next: CreateRecordState | undefined;
       try {
         next = await createRecordAction({ status: "idle" }, formData);
       } catch {
@@ -141,81 +135,25 @@ export function NewRecordForm() {
         requestAnimationFrame(() => alertRef.current?.focus());
         return;
       }
+      // On success the action redirects to the new record, so nothing comes back.
+      if (!next) return;
       setResult(next);
       if (next.status === "invalid") {
         setErrors(next.errors);
         requestAnimationFrame(() => summaryRef.current?.focus());
-      } else if (next.status === "unauthorized") {
+      } else if (next.status === "unauthorized" || next.status === "error") {
         requestAnimationFrame(() => alertRef.current?.focus());
-      } else if (next.status === "success") {
-        requestAnimationFrame(() => successRef.current?.focus());
       }
     });
   }
 
-  function reset() {
-    setValues(initialValues);
-    setErrors({});
-    setAttempted(false);
-    setRequestFailed(false);
-    setResult({ status: "idle" });
-  }
-
-  if (result.status === "success") {
-    const { preview } = result;
-    return (
-      <Card className="p-6 sm:p-8">
-        <div className="flex items-start gap-4">
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-accent-soft text-accent-strong">
-            <CheckIcon className="size-5" />
-          </span>
-          <div className="min-w-0 space-y-1">
-            <h2 ref={successRef} tabIndex={-1} className="text-lg font-semibold text-ink focus:outline-none">
-              Record draft created (demo)
-            </h2>
-            <p className="text-sm leading-relaxed text-ink-muted">
-              The server checked your session and validated the details, but nothing was saved
-              and no link was sent. Saving records and generating real confirmation links arrive
-              in the next milestone.
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-6 rounded-lg border border-line bg-canvas p-4 sm:ml-14">
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge status="draft" />
-            <DemoTag />
-          </div>
-          <p className="mt-3 font-medium text-ink">{preview.title}</p>
-          <p className="mt-0.5 text-sm text-ink-subtle">
-            {preview.clientName}
-            {preview.clientOrganization && ` · ${preview.clientOrganization}`}
-          </p>
-        </div>
-
-        <div className="mt-6 flex flex-col gap-3 sm:ml-14 sm:flex-row">
-          {pendingSampleId && (
-            <Link href={`/records/${pendingSampleId}`} className={buttonStyles()}>
-              View a sample pending record
-            </Link>
-          )}
-          <Link href={demoClientLinkPath} className={buttonStyles({ variant: "secondary" })}>
-            Preview the client view
-          </Link>
-          <Button variant="ghost" onClick={reset}>
-            Create another
-          </Button>
-        </div>
-      </Card>
-    );
-  }
-
   const summaryErrors = fieldOrder.filter(({ name }) => errors[name]);
   const sessionExpired = result.status === "unauthorized";
+  const saveFailed = requestFailed || result.status === "error";
 
   return (
     <form onSubmit={handleSubmit} noValidate aria-describedby="form-required-note">
-      {(sessionExpired || requestFailed) && (
+      {(sessionExpired || saveFailed) && (
         <div
           ref={alertRef}
           tabIndex={-1}
@@ -236,8 +174,9 @@ export function NewRecordForm() {
             </p>
           ) : (
             <p className="text-ink">
-              <span className="font-semibold text-danger">Something went wrong. </span>
-              Check your connection and try again.
+              <span className="font-semibold text-danger">Your record wasn&rsquo;t saved. </span>
+              Something went wrong on our side or with your connection. Your entries are still
+              here, so you can try again.
             </p>
           )}
         </div>
@@ -472,13 +411,13 @@ export function NewRecordForm() {
 
       <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p id="form-required-note" className="text-sm text-ink-subtle">
-          Fields marked Optional can be left blank. Demo only: nothing is saved.
+          Fields marked Optional can be left blank. Records are saved as drafts until you send a link.
         </p>
         <div className="flex flex-col-reverse gap-3 sm:flex-row">
           <Link href="/dashboard" className={buttonStyles({ variant: "ghost" })}>
             Cancel
           </Link>
-          <Button type="submit" loading={submitting} loadingText="Creating…">
+          <Button type="submit" loading={submitting} loadingText="Saving…">
             Create record
           </Button>
         </div>

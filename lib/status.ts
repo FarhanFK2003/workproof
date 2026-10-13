@@ -1,4 +1,4 @@
-import type { RecordStatus } from "./types";
+import type { LinkStatus, RecordStatus } from "./types";
 
 export const STATUS_META: Record<
   RecordStatus,
@@ -35,3 +35,26 @@ export const STATUS_ORDER: readonly RecordStatus[] = [
   "draft",
   "anchored",
 ];
+
+export function countByStatus(
+  records: readonly { status: RecordStatus }[],
+): Record<RecordStatus, number> {
+  const counts: Record<RecordStatus, number> = {
+    draft: 0,
+    pending: 0,
+    confirmed: 0,
+    disputed: 0,
+    anchored: 0,
+  };
+  for (const record of records) counts[record.status] += 1;
+  return counts;
+}
+
+/** State of a confirmation link at `nowMs`. The database re-checks expiry on use. */
+export function deriveLinkStatus(
+  link: { expiresAt: string; consumedAt: string | null },
+  nowMs: number,
+): LinkStatus {
+  if (link.consumedAt) return "used";
+  return Date.parse(link.expiresAt) <= nowMs ? "expired" : "active";
+}

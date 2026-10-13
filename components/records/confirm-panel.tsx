@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
-import { AlertIcon, CheckIcon } from "@/components/icons";
+import { useRef, useState, useTransition, type FormEvent, type ReactNode, type RefObject } from "react";
+import { submitDecisionAction, type DecisionState } from "@/app/confirm/[token]/actions";
+import { AlertIcon, CheckIcon, ClockIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,7 +19,9 @@ import {
 type Mode = "confirmed" | "disputed";
 type Errors = FieldErrors<"name" | "acknowledged" | "reason">;
 
-const SIMULATED_DELAY_MS = 900;
+function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
 
 /** Ends a sentence without doubling a trailing period (e.g. "Atlas Freight Co."). */
 function endSentence(text: string): string {
@@ -26,86 +29,139 @@ function endSentence(text: string): string {
 }
 
 interface ConfirmPanelProps {
+  token: string;
+  /** Display name, or a neutral phrase such as "the freelancer". */
   freelancerName: string;
   organization?: string;
 }
 
-export function ConfirmPanel({ freelancerName, organization }: ConfirmPanelProps) {
+function Outcome({
+  tone,
+  title,
+  children,
+  headingRef,
+}: {
+  tone: "success" | "warning" | "neutral";
+  title: string;
+  children: ReactNode;
+  headingRef: RefObject<HTMLHeadingElement | null>;
+}) {
+  const Icon = tone === "success" ? CheckIcon : tone === "warning" ? AlertIcon : ClockIcon;
+  return (
+    <Card className="p-6 sm:p-8">
+      <div className="flex items-start gap-4">
+        <span
+          className={cn(
+            "grid size-10 shrink-0 place-items-center rounded-full",
+            tone === "success" && "bg-accent-soft text-accent-strong",
+            tone === "warning" && "bg-warning-soft text-warning",
+            tone === "neutral" && "bg-muted text-ink-subtle",
+          )}
+        >
+          <Icon className="size-5" />
+        </span>
+        <div className="min-w-0 space-y-2">
+          <h2 ref={headingRef} tabIndex={-1} className="text-lg font-semibold text-ink focus:outline-none">
+            {title}
+          </h2>
+          <div className="space-y-2 text-sm leading-relaxed text-ink-muted">{children}</div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+export function ConfirmPanel({ token, freelancerName, organization }: ConfirmPanelProps) {
   const [mode, setMode] = useState<Mode>("confirmed");
   const [name, setName] = useState("");
   const [acknowledged, setAcknowledged] = useState(false);
   const [reason, setReason] = useState("");
   const [errors, setErrors] = useState<Errors>({});
-  const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<{ kind: Mode; name: string } | null>(null);
-  const resultRef = useRef<HTMLHeadingElement>(null);
+  const [result, setResult] = useState<DecisionState>({ status: "idle" });
+  const [submitting, startTransition] = useTransition();
+  const outcomeRef = useRef<HTMLHeadingElement>(null);
+  const alertRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
   function switchMode(next: Mode) {
     setMode(next);
     setErrors({});
+    setResult({ status: "idle" });
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function focusFirstInvalid() {
+    requestAnimationFrame(() =>
+      formRef.current?.querySelector<HTMLElement>("[aria-invalid='true']")?.focus(),
+    );
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const values: ClientResponseValues = { kind: mode, name, acknowledged, reason };
     const nextErrors = validateClientResponse(values);
     setErrors(nextErrors);
     if (hasErrors(nextErrors)) {
-      // Focus the first invalid control once the error state has rendered.
-      requestAnimationFrame(() =>
-        formRef.current?.querySelector<HTMLElement>("[aria-invalid='true']")?.focus(),
-      );
+      focusFirstInvalid();
       return;
     }
-    setSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, SIMULATED_DELAY_MS));
-    setSubmitting(false);
-    setResult({ kind: mode, name: name.trim() });
-    requestAnimationFrame(() => resultRef.current?.focus());
+    startTransition(async () => {
+      let next: DecisionState;
+      try {
+        next = await submitDecisionAction(token, values);
+      } catch {
+        next = { status: "error" };
+      }
+      setResult(next);
+      if (next.status === "invalid_input") {
+        setErrors(next.errors);
+        focusFirstInvalid();
+      } else if (next.status === "error") {
+        requestAnimationFrame(() => alertRef.current?.focus());
+      } else {
+        requestAnimationFrame(() => outcomeRef.current?.focus());
+      }
+    });
   }
 
-  function startOver() {
-    setResult(null);
-    setMode("confirmed");
-    setName("");
-    setAcknowledged(false);
-    setReason("");
-    setErrors({});
-  }
-
-  if (result) {
+  if (result.status === "recorded") {
     const confirmed = result.kind === "confirmed";
     return (
-      <Card className="p-6 sm:p-8">
-        <div className="flex items-start gap-4">
-          <span
-            className={cn(
-              "grid size-10 shrink-0 place-items-center rounded-full",
-              confirmed ? "bg-accent-soft text-accent-strong" : "bg-warning-soft text-warning",
-            )}
-          >
-            {confirmed ? <CheckIcon className="size-5" /> : <AlertIcon className="size-5" />}
-          </span>
-          <div className="min-w-0 space-y-2">
-            <h2 ref={resultRef} tabIndex={-1} className="text-lg font-semibold text-ink focus:outline-none">
-              {confirmed ? "Thanks, your confirmation is recorded (demo)" : "Dispute submitted (demo)"}
-            </h2>
-            <p className="text-sm leading-relaxed text-ink-muted">
-              {confirmed
-                ? `In the live product, ${freelancerName} would see that ${result.name} confirmed this work.`
-                : `In the live product, ${freelancerName} would see your explanation and could update the record.`}
-            </p>
-            <p className="rounded-lg border border-dashed border-line-strong px-3 py-2 text-sm text-ink-muted">
-              <span className="font-semibold text-ink">Simulated only.</span> Nothing was saved or
-              sent, and nothing was written to a blockchain.
-            </p>
-            <Button variant="ghost" size="sm" className="-ml-3" onClick={startOver}>
-              Start over
-            </Button>
-          </div>
-        </div>
-      </Card>
+      <Outcome
+        tone={confirmed ? "success" : "warning"}
+        title={confirmed ? "Thank you. Your confirmation has been recorded." : "Your dispute has been recorded."}
+        headingRef={outcomeRef}
+      >
+        <p>
+          {confirmed
+            ? `${capitalize(freelancerName)} can now show this project as client-confirmed.`
+            : `${capitalize(freelancerName)} will see your explanation and can correct the record.`}
+        </p>
+        <p>
+          Your response covers the work described above. It doesn&rsquo;t confirm or prove that a
+          payment was made. This link can&rsquo;t be used again, and you can close this page.
+        </p>
+      </Outcome>
+    );
+  }
+  if (result.status === "already_used" || result.status === "not_pending") {
+    return (
+      <Outcome tone="neutral" title="This request has already been answered" headingRef={outcomeRef}>
+        <p>A response was already recorded for this project, so no further action is needed.</p>
+      </Outcome>
+    );
+  }
+  if (result.status === "expired") {
+    return (
+      <Outcome tone="neutral" title="This link has expired" headingRef={outcomeRef}>
+        <p>Ask {freelancerName} to send you a new confirmation link.</p>
+      </Outcome>
+    );
+  }
+  if (result.status === "invalid") {
+    return (
+      <Outcome tone="neutral" title="This link is no longer valid" headingRef={outcomeRef}>
+        <p>It may have been replaced by a newer link. Ask {freelancerName} to send you the latest one.</p>
+      </Outcome>
     );
   }
 
@@ -124,6 +180,21 @@ export function ConfirmPanel({ freelancerName, organization }: ConfirmPanelProps
               : "Takes less than a minute. No account or wallet needed."}
           </p>
         </div>
+
+        {result.status === "error" && (
+          <div
+            ref={alertRef}
+            tabIndex={-1}
+            role="alert"
+            className="flex gap-2.5 rounded-lg border border-danger/30 bg-danger-soft p-3 text-sm focus:outline-2 focus:outline-offset-2 focus:outline-danger"
+          >
+            <AlertIcon className="mt-0.5 text-danger" />
+            <p className="text-ink">
+              We couldn&rsquo;t save your response. Nothing was recorded, so please try again in a
+              moment.
+            </p>
+          </div>
+        )}
 
         <Field
           id="responder-name"

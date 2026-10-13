@@ -9,11 +9,12 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { cn } from "@/lib/cn";
 import { formatDateRange } from "@/lib/format";
 import { STATUS_META, STATUS_ORDER } from "@/lib/status";
-import type { RecordStatus, WorkRecord } from "@/lib/types";
+import type { RecordListItem } from "@/lib/record-list-item";
+import type { RecordStatus } from "@/lib/types";
 
 type Filter = "all" | RecordStatus;
 
-function RecordRow({ record }: { record: WorkRecord }) {
+function RecordRow({ record }: { record: RecordListItem }) {
   return (
     <li>
       <Link
@@ -76,7 +77,7 @@ function FilteredEmptyState({ filter }: { filter: Filter }) {
   );
 }
 
-export function RecordList({ records }: { records: readonly WorkRecord[] }) {
+export function RecordList({ records }: { records: readonly RecordListItem[] }) {
   const [filter, setFilter] = useState<Filter>("all");
   const filters: Filter[] = ["all", ...STATUS_ORDER];
   const visible = filter === "all" ? records : records.filter((r) => r.status === filter);

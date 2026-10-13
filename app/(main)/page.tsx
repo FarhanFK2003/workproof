@@ -13,7 +13,7 @@ import { Container } from "@/components/page-layout";
 import { buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { demoClientLinkPath, getDemoRecord } from "@/lib/demo-data";
+import { getDemoRecord } from "@/lib/demo-data";
 import { formatDate, formatDateRange } from "@/lib/format";
 
 const steps = [
@@ -71,14 +71,14 @@ export default function HomePage() {
                 <ArrowRightIcon />
               </Link>
               <Link
-                href={demoClientLinkPath}
+                href="#how-heading"
                 className={buttonStyles({ variant: "secondary", size: "lg" })}
               >
-                See the client view
+                How it works
               </Link>
             </div>
             <p className="mt-4 text-sm text-ink-subtle">
-              Prototype with demo data. Nothing you do here is saved.
+              The sample record shown here is demo data.
             </p>
           </div>
 

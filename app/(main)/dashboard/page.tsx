@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { DemoNotice } from "@/components/demo-notice";
 import { PlusIcon } from "@/components/icons";
 import { Container, PageHeader } from "@/components/page-layout";
 import { PageSkeleton } from "@/components/page-skeleton";
 import { RecordList } from "@/components/records/record-list";
 import { buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { countByStatus, demoFreelancer, demoRecords } from "@/lib/demo-data";
+import { toRecordListItem } from "@/lib/record-list-item";
+import { listWorkRecords } from "@/lib/server/records";
 import { requireOwnerForPage } from "@/lib/server/session";
+import { countByStatus } from "@/lib/status";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -34,15 +35,17 @@ function Metric({ label, value, hint }: { label: string; value: number; hint: st
 }
 
 // Everything owner-specific renders here, after the server-side session check.
+// Database errors propagate to app/(main)/error.tsx.
 async function DashboardContent() {
   await requireOwnerForPage("/dashboard");
-  const counts = countByStatus(demoRecords);
+  const records = await listWorkRecords();
+  const counts = countByStatus(records);
 
   return (
     <div className="space-y-8">
       <PageHeader
         title="Work records"
-        description={`${demoFreelancer.name} · ${demoFreelancer.headline}`}
+        description="Projects you've logged and their client confirmation status."
         actions={
           <Link href="/records/new" className={buttonStyles()}>
             <PlusIcon />
@@ -51,17 +54,12 @@ async function DashboardContent() {
         }
       />
 
-      <DemoNotice>
-        These records, clients, and amounts are fictional samples. Actions on this page
-        aren&rsquo;t saved.
-      </DemoNotice>
-
       <section aria-labelledby="summary-heading">
         <h2 id="summary-heading" className="sr-only">
           Summary
         </h2>
         <dl className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-          <Metric label="Total records" value={demoRecords.length} hint="Across all clients" />
+          <Metric label="Total records" value={records.length} hint="Across all clients" />
           <Metric label="Client-confirmed" value={counts.confirmed} hint="Ready to share" />
           <Metric label="Awaiting client" value={counts.pending} hint="Link sent, no response yet" />
           <Metric label="Anchored" value={counts.anchored} hint="On-chain anchoring coming soon" />
@@ -72,7 +70,7 @@ async function DashboardContent() {
         <h2 id="records-heading" className="text-lg font-semibold tracking-tight text-ink">
           All records
         </h2>
-        <RecordList records={demoRecords} />
+        <RecordList records={records.map(toRecordListItem)} />
       </section>
     </div>
   );

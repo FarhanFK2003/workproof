@@ -10,6 +10,7 @@ import {
   type RecordStatus,
   type WorkRecord,
 } from "@/lib/types";
+import { deriveLinkStatus } from "@/lib/status";
 import {
   parseClientResponse,
   parseWorkRecord,
@@ -110,6 +111,12 @@ function toWorkRecord(row: WorkRecordRow & { confirmation_requests: RequestSumma
     createdAt: row.created_at,
     linkSharedAt: request?.created_at,
     linkExpiresAt: request?.expires_at,
+    linkStatus: request
+      ? deriveLinkStatus(
+          { expiresAt: request.expires_at, consumedAt: request.consumed_at },
+          Date.now(),
+        )
+      : undefined,
     response: toResponse(row, status),
     isDemo: false,
   };
@@ -228,11 +235,11 @@ export async function getConfirmationView(token: string): Promise<ConfirmationVi
 
   const row = data.work_records;
   const status = expectOneOf(STORED_STATUSES, row.status, "status");
-  const state: ConfirmationView["state"] = data.consumed_at
-    ? "used"
-    : Date.parse(data.expires_at) <= Date.now()
-      ? "expired"
-      : "open";
+  const linkStatus = deriveLinkStatus(
+    { expiresAt: data.expires_at, consumedAt: data.consumed_at },
+    Date.now(),
+  );
+  const state: ConfirmationView["state"] = linkStatus === "active" ? "open" : linkStatus;
 
   return {
     state,

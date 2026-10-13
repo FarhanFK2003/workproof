@@ -1,15 +1,9 @@
 /**
- * DEMO DATA — fictional freelancer, clients, and records for the Milestone 1 UI.
+ * DEMO DATA — fictional records used only for the landing page's sample card.
  * Nothing here is persisted, and no record has been written to Monad.
  * Client emails use the reserved `.example` domain.
  */
-import type { Freelancer, RecordStatus, WorkRecord } from "./types";
-
-export const demoFreelancer: Freelancer = {
-  name: "Sara Malik",
-  headline: "Independent product designer & front-end developer",
-  isDemo: true,
-};
+import type { WorkRecord } from "./types";
 
 export const demoRecords: readonly WorkRecord[] = [
   {
@@ -159,24 +153,3 @@ export const demoRecords: readonly WorkRecord[] = [
 export function getDemoRecord(id: string): WorkRecord | undefined {
   return demoRecords.find((record) => record.id === id);
 }
-
-export function getDemoRecordByToken(token: string): WorkRecord | undefined {
-  return demoRecords.find((record) => record.confirmationToken === token);
-}
-
-export function countByStatus(
-  records: readonly WorkRecord[],
-): Record<RecordStatus, number> {
-  const counts: Record<RecordStatus, number> = {
-    draft: 0,
-    pending: 0,
-    confirmed: 0,
-    disputed: 0,
-    anchored: 0,
-  };
-  for (const record of records) counts[record.status] += 1;
-  return counts;
-}
-
-/** Path of the demo record that is still awaiting a client response. */
-export const demoClientLinkPath = `/confirm/${demoRecords[0].confirmationToken}`;

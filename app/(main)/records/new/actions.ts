@@ -1,20 +1,15 @@
 "use server";
 
-import { getOwnerSession } from "@/lib/server/session";
-import {
-  parseWorkRecord,
-  type FieldErrors,
-  type WorkRecordFormValues,
-} from "@/lib/validation";
+import { redirect } from "next/navigation";
+import { createWorkRecord } from "@/lib/server/records";
+import { getOwnerSession, UnauthorizedError } from "@/lib/server/session";
+import type { FieldErrors, WorkRecordFormValues } from "@/lib/validation";
 
 export type CreateRecordState =
   | { status: "idle" }
   | { status: "unauthorized" }
   | { status: "invalid"; errors: FieldErrors<keyof WorkRecordFormValues> }
-  | {
-      status: "success";
-      preview: { title: string; clientName: string; clientOrganization: string | null };
-    };
+  | { status: "error" };
 
 const FIELDS = [
   "title",
@@ -41,9 +36,8 @@ function readWorkRecordForm(formData: FormData): WorkRecordFormValues {
 }
 
 /**
- * Owner-only. Verifies the session and validates on the server.
- * Milestone 2B: records are not persisted yet. The database-backed version will
- * call createWorkRecord() from lib/server/records.ts, which re-checks the session.
+ * Owner-only. Validates on the server, saves the record as a draft, and
+ * redirects to it. createWorkRecord() re-checks the session and re-validates.
  */
 export async function createRecordAction(
   _previous: CreateRecordState,
@@ -51,16 +45,17 @@ export async function createRecordAction(
 ): Promise<CreateRecordState> {
   if (!(await getOwnerSession())) return { status: "unauthorized" };
 
-  const parsed = parseWorkRecord(readWorkRecordForm(formData));
-  if (!parsed.ok) return { status: "invalid", errors: parsed.errors };
+  let result: Awaited<ReturnType<typeof createWorkRecord>>;
+  try {
+    result = await createWorkRecord(readWorkRecordForm(formData));
+  } catch (error) {
+    if (error instanceof UnauthorizedError) return { status: "unauthorized" };
+    // Log only our own message (operation + error code), never the submitted data.
+    console.error("[records] Could not create record:", error instanceof Error ? error.message : "unknown error");
+    return { status: "error" };
+  }
 
-  // Return only what the success screen shows, never the full input.
-  return {
-    status: "success",
-    preview: {
-      title: parsed.value.title,
-      clientName: parsed.value.clientName,
-      clientOrganization: parsed.value.clientOrganization,
-    },
-  };
+  if (!result.ok) return { status: "invalid", errors: result.errors };
+  // Outside the try: redirect() works by throwing.
+  redirect(`/records/${result.id}`);
 }

@@ -1,30 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { CheckIcon, CopyIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { controlStyles } from "@/components/ui/input";
 import { cn } from "@/lib/cn";
 
-const noopSubscribe = () => () => {};
-
-/** The browser origin, or "" during server rendering (avoids hydration mismatches). */
-function useOrigin(): string {
-  return useSyncExternalStore(
-    noopSubscribe,
-    () => window.location.origin,
-    () => "",
-  );
-}
-
 type CopyStatus = "idle" | "copied" | "error";
 
-export function CopyLinkField({ path, label }: { path: string; label: string }) {
-  const origin = useOrigin();
+/** Read-only link with a copy button. `url` must be built on the server. */
+export function CopyLinkField({ url, label }: { url: string; label: string }) {
   const [status, setStatus] = useState<CopyStatus>("idle");
   const inputRef = useRef<HTMLInputElement>(null);
   const resetTimer = useRef<number | undefined>(undefined);
-  const url = `${origin}${path}`;
+  const inputId = useId();
+  const statusId = useId();
 
   useEffect(() => () => window.clearTimeout(resetTimer.current), []);
 
@@ -32,7 +22,7 @@ export function CopyLinkField({ path, label }: { path: string; label: string }) 
     window.clearTimeout(resetTimer.current);
     try {
       if (!navigator.clipboard) throw new Error("Clipboard API unavailable");
-      await navigator.clipboard.writeText(new URL(path, window.location.origin).toString());
+      await navigator.clipboard.writeText(url);
       setStatus("copied");
       resetTimer.current = window.setTimeout(() => setStatus("idle"), 2500);
     } catch {
@@ -45,13 +35,13 @@ export function CopyLinkField({ path, label }: { path: string; label: string }) 
 
   return (
     <div className="space-y-2">
-      <label htmlFor="confirmation-link" className="sr-only">
+      <label htmlFor={inputId} className="sr-only">
         {label}
       </label>
       <div className="flex gap-2">
         <input
           ref={inputRef}
-          id="confirmation-link"
+          id={inputId}
           readOnly
           value={url}
           onFocus={(e) => e.currentTarget.select()}
@@ -61,7 +51,7 @@ export function CopyLinkField({ path, label }: { path: string; label: string }) 
           variant={status === "copied" ? "secondary" : "primary"}
           onClick={copy}
           className="shrink-0"
-          aria-describedby="copy-status"
+          aria-describedby={statusId}
         >
           {status === "copied" ? (
             <>
@@ -77,7 +67,7 @@ export function CopyLinkField({ path, label }: { path: string; label: string }) 
         </Button>
       </div>
       <p
-        id="copy-status"
+        id={statusId}
         aria-live="polite"
         className={cn("min-h-5 text-xs", status === "error" ? "text-danger" : "text-ink-subtle")}
       >

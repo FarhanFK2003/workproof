@@ -13,7 +13,7 @@ interface Step {
   timestamp?: string;
 }
 
-function buildSteps(record: WorkRecord, freelancerName: string): Step[] {
+function buildSteps(record: WorkRecord): Step[] {
   const { client, response } = record;
 
   const responseStep: Step = response
@@ -33,20 +33,26 @@ function buildSteps(record: WorkRecord, freelancerName: string): Step[] {
           </>
         ),
       }
-    : {
-        title: "Client response",
-        state: record.linkSharedAt ? "current" : "upcoming",
-        description: record.linkSharedAt
-          ? `Waiting for ${client.name} to review.${record.linkExpiresAt ? ` Link expires ${formatDate(record.linkExpiresAt)}.` : ""}`
-          : `${client.name} confirms or disputes the claim.`,
-      };
+    : record.linkStatus === "expired"
+      ? {
+          title: "Link expired",
+          state: "attention",
+          description: `The link expired${record.linkExpiresAt ? ` on ${formatDate(record.linkExpiresAt)}` : ""} before ${client.name} responded. Generate a new link to continue.`,
+        }
+      : {
+          title: "Client response",
+          state: record.linkSharedAt ? "current" : "upcoming",
+          description: record.linkSharedAt
+            ? `Waiting for ${client.name} to review.${record.linkExpiresAt ? ` Link expires ${formatDate(record.linkExpiresAt)}.` : ""}`
+            : `${client.name} confirms or disputes the claim.`,
+        };
 
   return [
     {
       title: "Record created",
       state: "complete",
       timestamp: record.createdAt,
-      description: `Drafted by ${freelancerName}.`,
+      description: "Saved as a draft.",
     },
     record.linkSharedAt
       ? {
@@ -86,14 +92,8 @@ const stateLabels: Record<StepState, string> = {
   upcoming: "Not started",
 };
 
-export function RecordTimeline({
-  record,
-  freelancerName,
-}: {
-  record: WorkRecord;
-  freelancerName: string;
-}) {
-  const steps = buildSteps(record, freelancerName);
+export function RecordTimeline({ record }: { record: WorkRecord }) {
+  const steps = buildSteps(record);
 
   return (
     <ol className="relative">

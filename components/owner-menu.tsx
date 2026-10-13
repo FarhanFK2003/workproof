@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { logout } from "@/app/(main)/login/actions";
-import { demoFreelancer } from "@/lib/demo-data";
+import { getOwnerDisplayName } from "@/lib/server/app-config";
 import { getOwnerSession } from "@/lib/server/session";
 import { buttonStyles } from "./ui/button";
 
@@ -25,17 +25,18 @@ export async function OwnerMenu() {
     );
   }
 
+  const name = getOwnerDisplayName() ?? "Owner";
   return (
     <div className="flex items-center gap-2.5">
       <span className="hidden text-right leading-tight md:block">
-        <span className="block text-sm font-medium text-ink">{demoFreelancer.name}</span>
+        <span className="block text-sm font-medium text-ink">{name}</span>
         <span className="block text-xs text-ink-subtle">Workspace owner</span>
       </span>
       <span
         aria-hidden="true"
         className="hidden size-8 place-items-center rounded-full bg-accent-soft text-xs font-semibold text-accent-strong ring-1 ring-accent/20 sm:grid"
       >
-        {initials(demoFreelancer.name)}
+        {initials(name)}
       </span>
       <form action={logout}>
         <button type="submit" className={buttonStyles({ variant: "ghost", size: "sm" })}>

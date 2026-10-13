@@ -30,17 +30,14 @@ export interface ClientContact {
   email: string;
 }
 
+/** State of a record's most recent confirmation link. */
+export type LinkStatus = "active" | "expired" | "used";
+
 export interface ClientResponse {
   kind: "confirmed" | "disputed";
   respondedBy: string;
   respondedAt: string;
   note?: string;
-}
-
-export interface Freelancer {
-  name: string;
-  headline: string;
-  isDemo: true;
 }
 
 export interface WorkRecord {
@@ -59,6 +56,9 @@ export interface WorkRecord {
   createdAt: string;
   linkSharedAt?: string;
   linkExpiresAt?: string;
+  /** Present when a confirmation link has been issued. */
+  linkStatus?: LinkStatus;
+  /** Demo data only. Real tokens are never stored or read back. */
   confirmationToken?: string;
   response?: ClientResponse;
   /** True for fictional sample data; false for records stored in Supabase. */
